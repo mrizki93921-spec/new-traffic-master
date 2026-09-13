@@ -1,0 +1,2408 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+
+// Web Audio API Sound Generator for Sound Effects (No external audio file dependency)
+class SoundEngine {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+      }
+    }
+  }
+
+  playClick() {
+    if (this.muted || !this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.05);
+    } catch (e) {}
+  }
+
+  playCorrect() {
+    if (this.muted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+        gain.gain.setValueAtTime(0.25, now + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.2);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.2);
+      });
+    } catch (e) {}
+  }
+
+  playWrong() {
+    if (this.muted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(200, now);
+      osc.frequency.linearRampToValueAtTime(100, now + 0.25);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    } catch (e) {}
+  }
+
+  playEngine() {
+    if (this.muted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(80, now);
+      osc.frequency.exponentialRampToValueAtTime(280, now + 0.6);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } catch (e) {}
+  }
+
+  playVictory() {
+    if (this.muted || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const arpeggio = [440, 554.37, 659.25, 880, 1108.73];
+      arpeggio.forEach((freq, idx) => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+        gain.gain.setValueAtTime(0.3, now + idx * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 0.3);
+      });
+    } catch (e) {}
+  }
+}
+
+const sounds = new SoundEngine();
+
+const BADGES = [
+  { id: 'badge_1', name: 'Speed Starter', desc: 'Menyelesaikan Level 1-3', icon: '🚀', category: 'starter' },
+  { id: 'badge_2', name: 'Formula Master', desc: 'Berhasil memilih 10 rumus dengan tepat', icon: '📐', category: 'formula' },
+  { id: 'badge_3', name: 'Conversion Expert', desc: 'Menguasai konversi satuan km/jam ↔ m/s', icon: '🔄', category: 'conversion' },
+  { id: 'badge_4', name: 'GLB Master', desc: 'Menyelesaikan level Gerak Lurus Beraturan', icon: '🛣️', category: 'glb' },
+  { id: 'badge_5', name: 'Acceleration Pro', desc: 'Menyelesaikan level GLBB dengan sempurna', icon: '⚡', category: 'glbb' },
+  { id: 'badge_6', name: 'Traffic Master', desc: 'Menyelesaikan seluruh 8 Level permainan', icon: '🏆', category: 'final' },
+];
+
+const LEVELS_CONFIG = [
+  { id: 1, title: 'LEVEL 1 — START ENGINE', topic: 'Konsep Gerak & Kedudukan', desc: 'Memahami konsep gerak acuan dan perbedaan benda bergerak vs diam.', difficulty: 'Mudah', maxScore: 500, unlockReq: 0 },
+  { id: 2, title: 'LEVEL 2 — DISTANCE CHECK', topic: 'Jarak & Perpindahan', desc: 'Menentukan lintasan total (jarak) dan perubahan posisi (perpindahan).', difficulty: 'Mudah', maxScore: 500, unlockReq: 1 },
+  { id: 3, title: 'LEVEL 3 — SPEED LIMIT', topic: 'Kelajuan & Kecepatan (v = s / t)', desc: 'Menghitung kelajuan kendaraan dengan persamaan v = s/t.', difficulty: 'Mudah-Sedang', maxScore: 500, unlockReq: 2 },
+  { id: 4, title: 'LEVEL 4 — ROUTE PLANNER', topic: 'Pemilihan Persamaan Gerak', desc: 'Memilih rumus yang tepat (v=s/t, s=v×t, t=s/v) sebelum menghitung.', difficulty: 'Sedang', maxScore: 500, unlockReq: 3 },
+  { id: 5, title: 'LEVEL 5 — SPEED CONVERTER', topic: 'Konversi Satuan Kecepatan', desc: 'Mengubah satuan dari km/jam ke m/s dan sebaliknya (1 m/s = 3,6 km/jam).', difficulty: 'Sedang', maxScore: 500, unlockReq: 4 },
+  { id: 6, title: 'LEVEL 6 — GLB CITY', topic: 'Gerak Lurus Beraturan (GLB)', desc: 'Menganalisis kendaraan berkecepatan tetap tanpa percepatan.', difficulty: 'Sedang', maxScore: 500, unlockReq: 5 },
+  { id: 7, title: 'LEVEL 7 — ACCELERATION ZONE', topic: 'Gerak Lurus Berubah Beraturan', desc: 'Menghitung percepatan (a), kecepatan akhir (vt), dan jarak GLBB.', difficulty: 'Sedang-Sulit', maxScore: 500, unlockReq: 6 },
+  { id: 8, title: 'LEVEL 8 — TRAFFIC MASTER CHALLENGE', topic: 'Final Master Challenge', desc: 'Tantangan komprehensif memadukan seluruh materi Fisika Gerak Lurus.', difficulty: 'Sulit', maxScore: 750, unlockReq: 7 },
+];
+
+const QUESTION_BANK = [
+  // --- LEVEL 1 ---
+  {
+    id: 101, level: 1, type: 'mc',
+    question: 'Sebuah bus berjalan melewati halte. Ahmad duduk di dalam bus. Manakah pernyataan yang BENAR mengenai konsep gerak?',
+    known: ['Bus bergerak relatif terhadap halte', 'Ahmad duduk diam di kursi bus'],
+    target: 'Menentukan posisi acuan gerak',
+    options: ['Ahmad bergerak terhadap bus', 'Bus diam terhadap halte', 'Ahmad bergerak terhadap halte', 'Halte bergerak terhadap rumah'],
+    correctAnswer: 'Ahmad bergerak terhadap halte',
+    unit: '',
+    explanation: 'Gerak bersifat relatif. Terhadap halte di luar, Ahmad ikut berpindah posisi bersama bus, sehingga Ahmad dikatakan bergerak terhadap halte.',
+    hints: ['Perhatikan titik acuannya.', 'Halte berada diam di luar bus.', 'Karena posisi Ahmad berubah terhadap halte, maka Ahmad bergerak terhadap halte.'],
+    difficulty: 'easy', competency: 'Konsep Gerak'
+  },
+  {
+    id: 102, level: 1, type: 'mc',
+    question: 'Suatu benda dikatakan bergerak apabila...',
+    known: ['Posisi awal & akhir', 'Titik acuan'],
+    target: 'Syarat benda bergerak',
+    options: ['Bentuk benda berubah', 'Posisi benda berubah terhadap acuan tertentu', 'Kecepatan benda selalu berubah', 'Benda mengeluarkan suara mesin'],
+    correctAnswer: 'Posisi benda berubah terhadap acuan tertentu',
+    unit: '',
+    explanation: 'Dalam fisika, gerak didefinisikan sebagai perubahan posisi/kedudukan suatu benda terhadap titik acuan dalam kurun waktu tertentu.',
+    hints: ['Ingat definisi utama gerak dalam IPA.', 'Apakah gerak selalu membutuhkan mesin?', 'Fokus pada perubahan posisi terhadap acuan.'],
+    difficulty: 'easy', competency: 'Konsep Gerak'
+  },
+  {
+    id: 103, level: 1, type: 'mc',
+    question: 'Siti naik sepeda motor yang dikendarai ayahnya menuju sekolah. Siti dikatakan DIAM terhadap...',
+    known: ['Siti memboceng ayah', 'Sepeda motor melaju di jalan'],
+    target: 'Menentukan titik acuan di mana benda diam',
+    options: ['Pohon di pinggir jalan', 'Gedung sekolah', 'Ayah yang memboncengnya', 'Lampu lalu lintas'],
+    correctAnswer: 'Ayah yang memboncengnya',
+    unit: '',
+    explanation: 'Jarak antara Siti dan Ayahnya tidak berubah selama perjalanan, sehingga Siti diam relatif terhadap Ayah.',
+    hints: ['Acuan yang mana yang posisinya tidak berubah terhadap Siti?', 'Apakah jarak Siti ke Ayah berubah?', 'Siti dan Ayah bergerak bersama dalam satu kendaraan.'],
+    difficulty: 'easy', competency: 'Konsep Gerak'
+  },
+  {
+    id: 104, level: 1, type: 'mc',
+    question: 'Mobil A melaju berdampingan dengan Mobil B dengan kecepatan yang sama persis di jalan tol. Bagaimana gerak Mobil A terhadap Mobil B?',
+    known: ['Kecepatan A = Kecepatan B', 'Arah gerak sama'],
+    target: 'Gerak relatif dua benda sejajar',
+    options: ['Mobil A bergerak menjauhi Mobil B', 'Mobil A relatif diam terhadap Mobil B', 'Mobil A bergerak dipercepat', 'Mobil B membelakangi Mobil A'],
+    correctAnswer: 'Mobil A relatif diam terhadap Mobil B',
+    unit: '',
+    explanation: 'Karena kecepatan dan arahnya sama persis, jarak antara Mobil A dan Mobil B tetap konstan, sehingga relatif diam satu sama lain.',
+    hints: ['Apakah jarak antarkendaraan bertambah atau berkurang?', 'Kecepatan keduanya sama persis.', 'Jaraknya selalu konstan.'],
+    difficulty: 'easy', competency: 'Konsep Gerak'
+  },
+  {
+    id: 105, level: 1, type: 'mc',
+    question: 'Manakah contoh gerak lurus dalam kehidupan sehari-hari?',
+    known: ['Lintasan berupa garis lurus'],
+    target: 'Contoh gerak lurus',
+    options: ['Buah kelapa jatuh bebas dari pohonnya', 'Jarum jam yang berputar', 'Bumi mengelilingi matahari', 'Gerak komidi putar'],
+    correctAnswer: 'Buah kelapa jatuh bebas dari pohonnya',
+    unit: '',
+    explanation: 'Buah kelapa jatuh tegak lurus ke bawah karena gravitasi bumi (lintasan lurus). Jarum jam dan komidi putar merupakan gerak melingkar.',
+    hints: ['Cari lintasan yang tidak berbelok atau melingkar.', 'Bagaimana arah jatuhnya buah kelapa?', 'Gerak lurus memiliki lintasan berupa garis lurus.'],
+    difficulty: 'easy', competency: 'Konsep Gerak'
+  },
+
+  // --- LEVEL 2 ---
+  {
+    id: 201, level: 2, type: 'calc',
+    question: 'Sebuah mobil bergerak ke timur sejauh 400 meter, kemudian berbalik arah ke barat sejauh 100 meter. Berapakah JARAK TOTAL yang ditempuh mobil tersebut?',
+    known: ['Lintasan 1 = 400 m (Timur)', 'Lintasan 2 = 100 m (Barat)'],
+    target: 'Menghitung Jarak Total (s)',
+    formulaOptions: ['s = s1 + s2', 's = s1 - s2', 's = s1 × s2'],
+    correctFormula: 's = s1 + s2',
+    correctAnswer: 500,
+    unit: 'm',
+    explanation: 'Jarak adalah panjang seluruh lintasan yang ditempuh tanpa memperhitungkan arah. s = 400 m + 100 m = 500 m.',
+    hints: ['Jarak adalah TOTAL lintasan yang dilalui.', 'Jumlahkan seluruh lintasan tanpa mengurangkan.', '400 m + 100 m = ?'],
+    difficulty: 'easy', competency: 'Jarak & Waktu'
+  },
+  {
+    id: 202, level: 2, type: 'calc',
+    question: 'Berdasarkan soal sebelumnya (Timur 400 m, Barat 100 m), berapakah besarnya PERPINDAHAN mobil dari titik awal?',
+    known: ['Posisi Timur = +400 m', 'Posisi Barat = -100 m'],
+    target: 'Menghitung Perpindahan (Δx)',
+    formulaOptions: ['Δx = s1 + s2', 'Δx = s1 - s2', 'Δx = s1 / s2'],
+    correctFormula: 'Δx = s1 - s2',
+    correctAnswer: 300,
+    unit: 'm',
+    explanation: 'Perpindahan melihat posisi akhir terhadap posisi awal. Δx = 400 m - 100 m = 300 m ke arah timur.',
+    hints: ['Perpindahan memperhitungkan arah gerak.', 'Karena berbalik arah, kurangi lintasan awal dengan lintasan balik.', '400 m - 100 m = ?'],
+    difficulty: 'easy', competency: 'Jarak & Waktu'
+  },
+  {
+    id: 203, level: 2, type: 'calc',
+    question: 'Ayah mengendarai mobil mengelilingi lapangan berbentuk persegi dengan panjang sisi 150 meter sebanyak 1 putaran penuh. Berapakah jarak totalnya?',
+    known: ['Sisi persegi = 150 m', 'Jumlah sisi = 4'],
+    target: 'Jarak keliling',
+    formulaOptions: ['s = 4 × sisi', 's = sisi × sisi', 's = 2 × sisi'],
+    correctFormula: 's = 4 × sisi',
+    correctAnswer: 600,
+    unit: 'm',
+    explanation: 'Keliling persegi = 4 × sisi = 4 × 150 m = 600 m.',
+    hints: ['Persegi memiliki 4 sisi yang sama panjang.', 'Jarak total = keliling persegi.', '4 × 150 = ?'],
+    difficulty: 'easy', competency: 'Jarak & Waktu'
+  },
+  {
+    id: 204, level: 2, type: 'calc',
+    question: 'Budi berjalan dari titik A ke titik B sejauh 80 meter, lalu dari B ke C sejauh 60 meter tegak lurus (membentuk sudut siku-siku). Berapakah PERPINDAHAN Budi dari A ke C?',
+    known: ['Alas (a) = 80 m', 'Tinggi (b) = 60 m'],
+    target: 'Perpindahan segitiga siku-siku (Pythagoras)',
+    formulaOptions: ['Δx = √(a² + b²)', 'Δx = a + b', 'Δx = a - b'],
+    correctFormula: 'Δx = √(a² + b²)',
+    correctAnswer: 100,
+    unit: 'm',
+    explanation: 'Gunakan teorema Pythagoras: Δx = √(80² + 60²) = √(6400 + 3600) = √10000 = 100 m.',
+    hints: ['Gunakan persamaan Pythagoras c = √(a² + b²).', '80² = 6400 dan 60² = 3600.', '√(6400 + 3600) = √10000 = ?'],
+    difficulty: 'medium', competency: 'Jarak & Waktu'
+  },
+  {
+    id: 205, level: 2, type: 'calc',
+    question: 'Sebuah ambulans menempuh perjalanan dalam 3 tahap: 200 m, 350 m, dan 150 m pada jalur lurus searah. Berapakah total jaraknya?',
+    known: ['s1 = 200 m', 's2 = 350 m', 's3 = 150 m'],
+    target: 'Menjumlahkan 3 lintasan',
+    formulaOptions: ['s = s1 + s2 + s3', 's = s1 × s2 × s3', 's = (s1+s2) / s3'],
+    correctFormula: 's = s1 + s2 + s3',
+    correctAnswer: 700,
+    unit: 'm',
+    explanation: 's = 200 + 350 + 150 = 700 m.',
+    hints: ['Jumlahkan ketiga lintasan tersebut.', '200 + 350 = 550.', '550 + 150 = ?'],
+    difficulty: 'easy', competency: 'Jarak & Waktu'
+  },
+
+  // --- LEVEL 3 ---
+  {
+    id: 301, level: 3, type: 'calc',
+    question: 'Sebuah mobil listrik menempuh jarak 300 meter dalam waktu 30 sekon. Berapakah kelajuan mobil tersebut?',
+    known: ['Jarak (s) = 300 m', 'Waktu (t) = 30 s'],
+    target: 'Kelajuan (v)',
+    formulaOptions: ['v = s / t', 'v = s × t', 'v = t / s'],
+    correctFormula: 'v = s / t',
+    correctAnswer: 10,
+    unit: 'm/s',
+    explanation: 'v = s / t = 300 / 30 = 10 m/s.',
+    hints: ['Rumus kelajuan adalah jarak dibagi waktu.', 'Substitusi: v = 300 / 30.', '300 dibagi 30 = ?'],
+    difficulty: 'easy', competency: 'Kelajuan'
+  },
+  {
+    id: 302, level: 3, type: 'calc',
+    question: 'Sepeda motor melaju menempuh lintasan 500 meter dalam waktu 25 sekon. Berapakah kelajuannya?',
+    known: ['Jarak (s) = 500 m', 'Waktu (t) = 25 s'],
+    target: 'Kelajuan (v)',
+    formulaOptions: ['v = s / t', 'v = s × t', 'v = t / s'],
+    correctFormula: 'v = s / t',
+    correctAnswer: 20,
+    unit: 'm/s',
+    explanation: 'v = s / t = 500 / 25 = 20 m/s.',
+    hints: ['Gunakan persamaan v = s / t.', '500 / 25 = 20.', 'Hasilnya 20 m/s.'],
+    difficulty: 'easy', competency: 'Kelajuan'
+  },
+  {
+    id: 303, level: 3, type: 'calc',
+    question: 'Pelari maraton menempuh jarak 1.200 meter dalam waktu 200 sekon. Berapakah kelajuan rata-rata pelari tersebut?',
+    known: ['Jarak (s) = 1200 m', 'Waktu (t) = 200 s'],
+    target: 'Kelajuan (v)',
+    formulaOptions: ['v = s / t', 'v = s × t', 'v = t / s'],
+    correctFormula: 'v = s / t',
+    correctAnswer: 6,
+    unit: 'm/s',
+    explanation: 'v = s / t = 1200 / 200 = 6 m/s.',
+    hints: ['Bagi jarak 1200 dengan waktu 200.', 'Coret dua nol: 12 / 2.', '12 / 2 = 6 m/s.'],
+    difficulty: 'easy', competency: 'Kelajuan'
+  },
+  {
+    id: 304, level: 3, type: 'calc',
+    question: 'Sebuah bus menempuh jarak 180 meter dalam waktu 15 sekon. Berapakah kelajuan bus tersebut?',
+    known: ['Jarak (s) = 180 m', 'Waktu (t) = 15 s'],
+    target: 'Kelajuan (v)',
+    formulaOptions: ['v = s / t', 'v = s × t', 'v = t / s'],
+    correctFormula: 'v = s / t',
+    correctAnswer: 12,
+    unit: 'm/s',
+    explanation: 'v = s / t = 180 / 15 = 12 m/s.',
+    hints: ['Gunakan rumus v = s / t.', '180 / 15 = ?', '15 × 12 = 180.'],
+    difficulty: 'medium', competency: 'Kelajuan'
+  },
+  {
+    id: 305, level: 3, type: 'calc',
+    question: 'Kereta mini di taman bermain bergerak sejauh 450 meter dalam waktu 90 sekon. Berapakah kelajuannya?',
+    known: ['Jarak (s) = 450 m', 'Waktu (t) = 90 s'],
+    target: 'Kelajuan (v)',
+    formulaOptions: ['v = s / t', 'v = s × t', 'v = t / s'],
+    correctFormula: 'v = s / t',
+    correctAnswer: 5,
+    unit: 'm/s',
+    explanation: 'v = s / t = 450 / 90 = 5 m/s.',
+    hints: ['v = s / t.', '450 / 90 = 45 / 9.', '45 / 9 = 5.'],
+    difficulty: 'easy', competency: 'Kelajuan'
+  },
+
+  // --- LEVEL 4 ---
+  {
+    id: 401, level: 4, type: 'calc',
+    question: 'Sebuah mobil bergerak dengan kelajuan konstan 15 m/s selama 40 sekon. Berapakah JARAK yang ditempuh mobil tersebut?',
+    known: ['Kelajuan (v) = 15 m/s', 'Waktu (t) = 40 s'],
+    target: 'Menentukan Rumus & Jarak (s)',
+    formulaOptions: ['s = v × t', 's = v / t', 's = t / v'],
+    correctFormula: 's = v × t',
+    correctAnswer: 600,
+    unit: 'm',
+    explanation: 'Untuk mencari jarak (s), gunakan rumus s = v × t = 15 × 40 = 600 m.',
+    hints: ['Kamu diminta mencari Jarak (s).', 'Rumus mencari jarak adalah s = v × t.', '15 × 40 = 600 m.'],
+    difficulty: 'medium', competency: 'Pilih Persamaan'
+  },
+  {
+    id: 402, level: 4, type: 'calc',
+    question: 'Pengendara motor harus menempuh jarak 900 meter dengan kelajuan tetap 18 m/s. Berapa WAKTU yang dibutuhkan pengendara tersebut?',
+    known: ['Jarak (s) = 900 m', 'Kelajuan (v) = 18 m/s'],
+    target: 'Menentukan Rumus & Waktu (t)',
+    formulaOptions: ['t = s / v', 't = s × v', 't = v / s'],
+    correctFormula: 't = s / v',
+    correctAnswer: 50,
+    unit: 's',
+    explanation: 'Untuk mencari waktu (t), gunakan rumus t = s / v = 900 / 18 = 50 sekon.',
+    hints: ['Besaran yang dicari adalah Waktu (t).', 'Gunakan rumus t = s / v.', '900 / 18 = 50 s.'],
+    difficulty: 'medium', competency: 'Pilih Persamaan'
+  },
+  {
+    id: 403, level: 4, type: 'calc',
+    question: 'Truk mengangkut barang melaju sejauh 1.500 meter dalam waktu 60 sekon. Berapakah KELAJUAN truk tersebut?',
+    known: ['Jarak (s) = 1500 m', 'Waktu (t) = 60 s'],
+    target: 'Kelajuan (v)',
+    formulaOptions: ['v = s / t', 'v = s × t', 'v = t / s'],
+    correctFormula: 'v = s / t',
+    correctAnswer: 25,
+    unit: 'm/s',
+    explanation: 'v = s / t = 1500 / 60 = 25 m/s.',
+    hints: ['Cari kelajuan (v).', 'v = s / t.', '1500 / 60 = 25 m/s.'],
+    difficulty: 'medium', competency: 'Pilih Persamaan'
+  },
+  {
+    id: 404, level: 4, type: 'calc',
+    question: 'Drone pengantar barang terbang dengan kelajuan 12 m/s selama 25 sekon. Berapakah jarak total yang ditempuh drone?',
+    known: ['v = 12 m/s', 't = 25 s'],
+    target: 'Jarak (s)',
+    formulaOptions: ['s = v × t', 's = v / t', 's = t / v'],
+    correctFormula: 's = v × t',
+    correctAnswer: 300,
+    unit: 'm',
+    explanation: 's = v × t = 12 × 25 = 300 m.',
+    hints: ['Cari s.', 's = v × t.', '12 × 25 = 300 m.'],
+    difficulty: 'medium', competency: 'Pilih Persamaan'
+  },
+  {
+    id: 405, level: 4, type: 'calc',
+    question: 'Mobil patroli polisi hendak menempuh jarak 800 meter dengan kelajuan 20 m/s. Berapa lama waktu yang diperlukan?',
+    known: ['s = 800 m', 'v = 20 m/s'],
+    target: 'Waktu (t)',
+    formulaOptions: ['t = s / v', 't = s × v', 't = v / s'],
+    correctFormula: 't = s / v',
+    correctAnswer: 40,
+    unit: 's',
+    explanation: 't = s / v = 800 / 20 = 40 s.',
+    hints: ['Cari t.', 't = s / v.', '800 / 20 = 40 s.'],
+    difficulty: 'medium', competency: 'Pilih Persamaan'
+  },
+
+  // --- LEVEL 5 ---
+  {
+    id: 501, level: 5, type: 'calc',
+    question: 'Speedometer mobil menunjukkan kelajuan 72 km/jam. Jika dikonversi ke dalam satuan SI (m/s), berapakah nilainya?',
+    known: ['v = 72 km/jam', '1 km/jam = 1/3,6 m/s'],
+    target: 'Konversi km/jam → m/s',
+    formulaOptions: ['v(m/s) = v(km/jam) / 3,6', 'v(m/s) = v(km/jam) × 3,6', 'v(m/s) = v(km/jam) × 1000'],
+    correctFormula: 'v(m/s) = v(km/jam) / 3,6',
+    correctAnswer: 20,
+    unit: 'm/s',
+    explanation: 'Untuk mengubah km/jam ke m/s, bagi nilai km/jam dengan 3,6. (72 / 3,6 = 20 m/s). Atau (72 × 1000m) / 3600s = 20 m/s.',
+    hints: ['Ingat: 1 m/s = 3,6 km/jam.', 'Maka km/jam ke m/s cukup dibagi 3,6.', '72 / 3,6 = 20.'],
+    difficulty: 'medium', competency: 'Konversi Satuan'
+  },
+  {
+    id: 502, level: 5, type: 'calc',
+    question: 'Sebuah sepeda balap bergerak dengan kelajuan 15 m/s. Berapakah kelajuannya jika dinyatakan dalam km/jam?',
+    known: ['v = 15 m/s', '1 m/s = 3,6 km/jam'],
+    target: 'Konversi m/s → km/jam',
+    formulaOptions: ['v(km/jam) = v(m/s) × 3,6', 'v(km/jam) = v(m/s) / 3,6', 'v(km/jam) = v(m/s) / 1000'],
+    correctFormula: 'v(km/jam) = v(m/s) × 3,6',
+    correctAnswer: 54,
+    unit: 'km/jam',
+    explanation: 'Untuk mengubah m/s ke km/jam, kalikan nilai m/s dengan 3,6. (15 × 3,6 = 54 km/jam).',
+    hints: ['Ubah m/s ke km/jam dengan mengalikan 3,6.', '15 × 3,6 = ?', '15 × 3 = 45; 15 × 0,6 = 9. Total = 54.'],
+    difficulty: 'medium', competency: 'Konversi Satuan'
+  },
+  {
+    id: 503, level: 5, type: 'calc',
+    question: 'Batas kecepatan di jalan tol adalah 90 km/jam. Berapakah nilai tersebut dalam m/s?',
+    known: ['v = 90 km/jam'],
+    target: 'Konversi 90 km/jam → m/s',
+    formulaOptions: ['v(m/s) = v(km/jam) / 3,6', 'v(m/s) = v(km/jam) × 3,6', 'v(m/s) = v(km/jam) / 10'],
+    correctFormula: 'v(m/s) = v(km/jam) / 3,6',
+    correctAnswer: 25,
+    unit: 'm/s',
+    explanation: '90 / 3,6 = 25 m/s.',
+    hints: ['Bagi 90 dengan 3,6.', '900 / 36 = 25.', 'Jawabannya 25 m/s.'],
+    difficulty: 'medium', competency: 'Konversi Satuan'
+  },
+  {
+    id: 504, level: 5, type: 'calc',
+    question: 'Atlit lari cepat memiliki kecepatan 10 m/s. Berapa km/jam kecepatan atlit tersebut?',
+    known: ['v = 10 m/s'],
+    target: 'Konversi 10 m/s → km/jam',
+    formulaOptions: ['v(km/jam) = v(m/s) × 3,6', 'v(km/jam) = v(m/s) / 3,6', 'v(km/jam) = v(m/s) × 10'],
+    correctFormula: 'v(km/jam) = v(m/s) × 3,6',
+    correctAnswer: 36,
+    unit: 'km/jam',
+    explanation: '10 × 3,6 = 36 km/jam.',
+    hints: ['10 dikali 3,6.', '10 × 3,6 = 36 km/jam.'],
+    difficulty: 'easy', competency: 'Konversi Satuan'
+  },
+  {
+    id: 505, level: 5, type: 'calc',
+    question: 'Mobil sport melaju 108 km/jam di sirkuit. Berapakah kecepatannya dalam satuan m/s?',
+    known: ['v = 108 km/jam'],
+    target: 'Konversi 108 km/jam → m/s',
+    formulaOptions: ['v(m/s) = v(km/jam) / 3,6', 'v(m/s) = v(km/jam) × 3,6', 'v(m/s) = v(km/jam) / 100'],
+    correctFormula: 'v(m/s) = v(km/jam) / 3,6',
+    correctAnswer: 30,
+    unit: 'm/s',
+    explanation: '108 / 3,6 = 30 m/s.',
+    hints: ['108 dibagi 3,6.', '36 × 3 = 108, jadi 108 / 3,6 = 30 m/s.'],
+    difficulty: 'medium', competency: 'Konversi Satuan'
+  },
+
+  // --- LEVEL 6 ---
+  {
+    id: 601, level: 6, type: 'calc',
+    question: 'Sebuah mobil bergerak Gerak Lurus Beraturan (GLB) dengan kelajuan konstan 20 m/s selama 15 sekon. Berapakah jarak yang ditempuh?',
+    known: ['Gerak GLB (a = 0)', 'v = 20 m/s', 't = 15 s'],
+    target: 'Jarak GLB (s = v × t)',
+    formulaOptions: ['s = v × t', 's = v / t', 's = v + t'],
+    correctFormula: 's = v × t',
+    correctAnswer: 300,
+    unit: 'm',
+    explanation: 'Ciri khas GLB adalah kecepatan tetap (percepatan a = 0). Jarak ditempuh dengan s = v × t = 20 × 15 = 300 m.',
+    hints: ['Pada GLB, kecepatan selalu konstan.', 'Rumus jarak GLB: s = v × t.', '20 × 15 = 300 m.'],
+    difficulty: 'medium', competency: 'GLB'
+  },
+  {
+    id: 602, level: 6, type: 'calc',
+    question: 'Dua kota A dan B berjarak 1.200 meter. Sebuah bus GLB melaju dari kota A ke B dengan kelajuan tetap 24 m/s. Berapa detik waktu tempuhnya?',
+    known: ['s = 1200 m', 'v = 24 m/s (konstan)'],
+    target: 'Waktu tempuh GLB (t = s / v)',
+    formulaOptions: ['t = s / v', 't = s × v', 't = v / s'],
+    correctFormula: 't = s / v',
+    correctAnswer: 50,
+    unit: 's',
+    explanation: 't = s / v = 1200 / 24 = 50 sekon.',
+    hints: ['Gunakan rumus t = s / v.', '1200 / 24 = 50.', 'Waktu tempuh 50 detik.'],
+    difficulty: 'medium', competency: 'GLB'
+  },
+  {
+    id: 603, level: 6, type: 'calc',
+    question: 'Kereta api melaju dengan kecepatan konstan 90 km/jam (25 m/s) selama 2 menit (120 s). Berapa meter jarak yang ditempuh kereta?',
+    known: ['v = 25 m/s', 't = 120 s'],
+    target: 'Jarak GLB dengan konversi waktu',
+    formulaOptions: ['s = v × t', 's = v / t', 's = (v × t) / 60'],
+    correctFormula: 's = v × t',
+    correctAnswer: 3000,
+    unit: 'm',
+    explanation: 'Pastikan waktu dalam detik (2 menit = 120 s). s = v × t = 25 × 120 = 3.000 m.',
+    hints: ['Ubah 2 menit menjadi sekon dulu (2 × 60 = 120 s).', 'Kalikan v × t = 25 × 120.', '25 × 120 = 3000 m.'],
+    difficulty: 'medium', competency: 'GLB'
+  },
+  {
+    id: 604, level: 6, type: 'calc',
+    question: 'Ciri utama dari Gerak Lurus Beraturan (GLB) pada grafik kecepatan (v) terhadap waktu (t) adalah...',
+    known: ['Kecepatan (v) konstan'],
+    target: 'Karakteristik GLB',
+    options: ['Garis lurus mendatar (horisontal)', 'Garis miring naik ke atas', 'Garis lengkung parabola', 'Garis miring turun ke bawah'],
+    correctAnswer: 'Garis lurus mendatar (horisontal)',
+    unit: '',
+    explanation: 'Pada grafik v-t GLB, karena nilai v tidak berubah seiring waktu, grafiknya berupa garis lurus sejajar sumbu waktu (horisontal).',
+    hints: ['Nilai kecepatan v tidak berubah dari detik ke detik.', 'Grafik nilai tetap tampak mendatar.', 'Pilih garis lurus mendatar.'],
+    difficulty: 'medium', competency: 'GLB'
+  },
+  {
+    id: 605, level: 6, type: 'calc',
+    question: 'Mobil A bergerak GLB dengan kelajuan 15 m/s. Berapa jauh jarak yang ditempuh dalam waktu 1 menit (60 detik)?',
+    known: ['v = 15 m/s', 't = 60 s'],
+    target: 'Jarak GLB',
+    formulaOptions: ['s = v × t', 's = v / t', 's = t / v'],
+    correctFormula: 's = v × t',
+    correctAnswer: 900,
+    unit: 'm',
+    explanation: 's = 15 m/s × 60 s = 900 m.',
+    hints: ['s = v × t.', '15 × 60 = 900 m.'],
+    difficulty: 'easy', competency: 'GLB'
+  },
+
+  // --- LEVEL 7 ---
+  {
+    id: 701, level: 7, type: 'calc',
+    question: 'Sebuah mobil awal diam (v0 = 0 m/s), kemudian dipercepat dengan percepatan konstan a = 2 m/s² selama t = 5 sekon. Berapakah KECEPATAN AKHIR (vt) mobil tersebut?',
+    known: ['Kecepatan awal (v0) = 0 m/s', 'Percepatan (a) = 2 m/s²', 'Waktu (t) = 5 s'],
+    target: 'Kecepatan akhir GLBB (vt = v0 + a×t)',
+    formulaOptions: ['vt = v0 + (a × t)', 'vt = v0 - (a × t)', 'vt = (v0 + a) / t'],
+    correctFormula: 'vt = v0 + (a × t)',
+    correctAnswer: 10,
+    unit: 'm/s',
+    explanation: 'Persamaan GLBB: vt = v0 + a×t = 0 + (2 × 5) = 10 m/s.',
+    hints: ['Mobil dipercepat dari keadaan diam (v0 = 0).', 'vt = v0 + a × t.', 'vt = 0 + (2 × 5) = 10 m/s.'],
+    difficulty: 'hard', competency: 'GLBB'
+  },
+  {
+    id: 702, level: 7, type: 'calc',
+    question: 'Sepeda motor melaju dengan kecepatan awal 10 m/s. Pengendara menekan gas sehingga mengalami percepatan 3 m/s² selama 4 sekon. Berapa kecepatan akhirnya?',
+    known: ['v0 = 10 m/s', 'a = 3 m/s²', 't = 4 s'],
+    target: 'vt = v0 + a×t',
+    formulaOptions: ['vt = v0 + (a × t)', 'vt = v0 × a × t', 'vt = (v0 × t) + a'],
+    correctFormula: 'vt = v0 + (a × t)',
+    correctAnswer: 22,
+    unit: 'm/s',
+    explanation: 'vt = 10 + (3 × 4) = 10 + 12 = 22 m/s.',
+    hints: ['Hitung percepatan dulu: 3 × 4 = 12.', 'Tambahkan ke v0: 10 + 12.', 'Hasilnya 22 m/s.'],
+    difficulty: 'hard', competency: 'GLBB'
+  },
+  {
+    id: 703, level: 7, type: 'calc',
+    question: 'Sebuah mobil direm dari kecepatan awal 20 m/s hingga berhenti (vt = 0 m/s) dalam waktu 4 sekon. Berapakah PERLAMBATAN (a) mobil tersebut?',
+    known: ['v0 = 20 m/s', 'vt = 0 m/s', 't = 4 s'],
+    target: 'Perlambatan GLBB (a = (vt - v0) / t)',
+    formulaOptions: ['a = (v0 - vt) / t', 'a = (vt + v0) / t', 'a = v0 × t'],
+    correctFormula: 'a = (v0 - vt) / t',
+    correctAnswer: 5,
+    unit: 'm/s²',
+    explanation: 'Besar perlambatan = (v0 - vt) / t = (20 - 0) / 4 = 5 m/s².',
+    hints: ['Perlambatan membuat kecepatan berkurang dari 20 ke 0.', 'Selisih kecepatan = 20 m/s.', '20 / 4 sekon = 5 m/s².'],
+    difficulty: 'hard', competency: 'GLBB'
+  },
+  {
+    id: 704, level: 7, type: 'calc',
+    question: 'Mobil dari posisi diam (v0 = 0) mengalami percepatan 4 m/s² selama 5 sekon. Berapakah JARAK (s) yang ditempuh? (Gunakan s = 1/2 × a × t²)',
+    known: ['v0 = 0', 'a = 4 m/s²', 't = 5 s'],
+    target: 'Jarak GLBB (s = 1/2 a t²)',
+    formulaOptions: ['s = 0,5 × a × t²', 's = a × t', 's = a × t²'],
+    correctFormula: 's = 0,5 × a × t²',
+    correctAnswer: 50,
+    unit: 'm',
+    explanation: 's = 1/2 × a × t² = 0.5 × 4 × (5)² = 2 × 25 = 50 m.',
+    hints: ['Hitung t² dulu: 5² = 25.', 's = 0.5 × 4 × 25.', '2 × 25 = 50 m.'],
+    difficulty: 'hard', competency: 'GLBB'
+  },
+  {
+    id: 705, level: 7, type: 'calc',
+    question: 'Grafik kecepatan (v) terhadap waktu (t) untuk benda yang mengalami Gerak Lurus Berubah Beraturan (GLBB) dipercepat berupa...',
+    known: ['Kecepatan bertambah secara linier'],
+    target: 'Grafik v-t GLBB dipercepat',
+    options: ['Garis lurus miring naik ke atas', 'Garis lurus mendatar', 'Garis lurus miring turun ke bawah', 'Garis gelombang sinus'],
+    correctAnswer: 'Garis lurus miring naik ke atas',
+    unit: '',
+    explanation: 'Pada GLBB dipercepat, kecepatan bertambah secara konstan seiring waktu sehingga grafik v-t membentuk garis lurus miring naik.',
+    hints: ['Kecepatan bertambah seiring berjalannya waktu.', 'Grafik akan naik dari kiri ke kanan.', 'Garis miring naik ke atas.'],
+    difficulty: 'medium', competency: 'GLBB'
+  },
+
+  // --- LEVEL 8 ---
+  {
+    id: 801, level: 8, type: 'calc',
+    question: 'TRAFFIC CHALLENGE 1: Sebuah kendaraan melaju dengan kecepatan 72 km/jam (20 m/s). Pengemudi melihat lampu merah 100 meter di depan dan mengerem dengan perlambatan 2 m/s² selama 5 detik. Berapakah kecepatan kendaraan saat itu?',
+    known: ['v0 = 20 m/s', 'a = -2 m/s²', 't = 5 s'],
+    target: 'Kecepatan setelah pengereman (vt = v0 - a×t)',
+    formulaOptions: ['vt = v0 - (a × t)', 'vt = v0 + (a × t)', 'vt = v0 / (a × t)'],
+    correctFormula: 'vt = v0 - (a × t)',
+    correctAnswer: 10,
+    unit: 'm/s',
+    explanation: 'vt = 20 - (2 × 5) = 20 - 10 = 10 m/s (36 km/jam). Kendaraan melambat dengan aman.',
+    hints: ['Konversi 72 km/jam = 20 m/s.', 'Pengereman mengurangi kecepatan: vt = v0 - (a × t).', '20 - (2 × 5) = 10 m/s.'],
+    difficulty: 'hard', competency: 'Final Master Challenge'
+  },
+  {
+    id: 802, level: 8, type: 'calc',
+    question: 'TRAFFIC CHALLENGE 2: Dua sepeda motor A dan B bergerak dari tempat yang sama. Motor A bergerak GLB dengan kelajuan 15 m/s. Motor B berangkat bersamaan dari diam dengan percepatan 2 m/s². Setelah berapa detik kecepatan Motor B menyamai Motor A?',
+    known: ['vA = 15 m/s (konstan)', 'vB0 = 0', 'aB = 2 m/s²'],
+    target: 'Menyamakan vB dengan vA',
+    formulaOptions: ['t = vA / aB', 't = vA × aB', 't = aB / vA'],
+    correctFormula: 't = vA / aB',
+    correctAnswer: 7.5,
+    unit: 's',
+    explanation: 'vB = vB0 + aB×t ⇒ 15 = 0 + 2×t ⇒ t = 15 / 2 = 7,5 sekon.',
+    hints: ['Motor B butuh mencapai kecepatan 15 m/s.', 'vt = a × t  ⇒  15 = 2 × t.', 't = 15 / 2 = 7,5 s.'],
+    difficulty: 'hard', competency: 'Final Master Challenge'
+  },
+  {
+    id: 803, level: 8, type: 'calc',
+    question: 'TRAFFIC CHALLENGE 3: Sebuah mobil ambulan harus menempuh jarak 3,6 km (3.600 m) untuk tiba di rumah sakit dalam waktu tepat 3 menit (180 detik). Berapakah kelajuan rata-rata minimal yang harus dijaga ambulan?',
+    known: ['s = 3600 m', 't = 180 s'],
+    target: 'v = s / t',
+    formulaOptions: ['v = s / t', 'v = s × t', 'v = t / s'],
+    correctFormula: 'v = s / t',
+    correctAnswer: 20,
+    unit: 'm/s',
+    explanation: 'v = 3600 m / 180 s = 20 m/s (setara dengan 72 km/jam).',
+    hints: ['Konversi 3,6 km = 3600 m dan 3 menit = 180 s.', 'v = 3600 / 180.', '3600 / 180 = 20 m/s.'],
+    difficulty: 'hard', competency: 'Final Master Challenge'
+  },
+  {
+    id: 804, level: 8, type: 'calc',
+    question: 'TRAFFIC CHALLENGE 4: Truk melaju dengan kecepatan awal 54 km/jam (15 m/s) lalu dipercepat 1 m/s² selama 10 sekon. Berapakah jarak total yang ditempuh truk selama percepatan tersebut? (s = v0×t + 0.5×a×t²)',
+    known: ['v0 = 15 m/s', 'a = 1 m/s²', 't = 10 s'],
+    target: 'Jarak GLBB lengkap',
+    formulaOptions: ['s = (v0 × t) + (0,5 × a × t²)', 's = v0 × t', 's = a × t²'],
+    correctFormula: 's = (v0 × t) + (0,5 × a × t²)',
+    correctAnswer: 200,
+    unit: 'm',
+    explanation: 's = (15 × 10) + (0,5 × 1 × 10²) = 150 + (0,5 × 100) = 150 + 50 = 200 m.',
+    hints: ['Hitung bagian 1: v0 × t = 15 × 10 = 150.', 'Hitung bagian 2: 0.5 × 1 × 10² = 50.', '150 + 50 = 200 m.'],
+    difficulty: 'hard', competency: 'Final Master Challenge'
+  },
+  {
+    id: 805, level: 8, type: 'calc',
+    question: 'TRAFFIC MASTER FINAL: Kereta cepat melaju dari kecepatan diam hingga mencapai kecepatan 300 km/jam (83.3 m/s) di lintasan lurus. Konsep fisika manakah yang PALING TEPAT menggambarkan fenomena ini?',
+    known: ['Perubahan kecepatan dari 0 ke 300 km/jam pada jalur lurus'],
+    target: 'Identifikasi Gerak GLBB',
+    options: ['GLBB dipercepat karena kecepatan bertambah secara teratur', 'GLB karena lintasannya berupa garis lurus', 'GLBB diperlambat karena kereta bertambah berat', 'Gerak Melingkar Beraturan'],
+    correctAnswer: 'GLBB dipercepat karena kecepatan bertambah secara teratur',
+    unit: '',
+    explanation: 'Perubahan kecepatan dari diam hingga tinggi pada lintasan lurus menunjukkan adanya percepatan positif, yang merupakan ciri khas GLBB dipercepat.',
+    hints: ['Kecepatan berubah dari nol menjadi sangat tinggi.', 'Lintasan lurus + kecepatan bertambah = ?', 'GLBB dipercepat.'],
+    difficulty: 'hard', competency: 'Final Master Challenge'
+  }
+];
+
+export default function App() {
+  // Navigation Routing States: 'loading' | 'register' | 'home' | 'tutorial' | 'level_select' | 'game' | 'result' | 'remedial' | 'leaderboard' | 'feedback' | 'profile' | 'teacher'
+  const [currentPage, setCurrentPage] = useState('loading');
+  
+  // Sound Mute Toggle State
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Player Profile State
+  const [player, setPlayer] = useState(() => {
+    const saved = localStorage.getItem('tm_player');
+    return saved ? JSON.parse(saved) : { name: '', playerClass: '', absen: '', bestScore: 0, highestLevel: 1, completedLevels: [] };
+  });
+
+  // Game Progress & Unlocked Badges
+  const [unlockedBadges, setUnlockedBadges] = useState(() => {
+    const saved = localStorage.getItem('tm_badges');
+    return saved ? JSON.parse(saved) : ['badge_1'];
+  });
+
+  // Active Game Session State
+  const [activeLevel, setActiveLevel] = useState(1);
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [selectedFormula, setSelectedFormula] = useState('');
+  const [userAnswer, setUserAnswer] = useState('');
+  const [hintsUsedCount, setHintsUsedCount] = useState(0);
+  const [showHintModal, setShowHintModal] = useState(false);
+  const [feedbackState, setFeedbackState] = useState(null); // { isCorrect: bool, message: str, explanation: str }
+  const [vehiclePosition, setVehiclePosition] = useState(0); // 0 to 100 percentage
+  const [timerSeconds, setTimerSeconds] = useState(45);
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const [sessionHistory, setSessionHistory] = useState([]); // [{ questionId, isCorrect, hintsUsed, timeTaken }]
+
+  // Remedial Mode State
+  const [remedialQueue, setRemedialQueue] = useState([]);
+  const [isRemedialActive, setIsRemedialActive] = useState(false);
+
+  // Sync player data to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('tm_player', JSON.stringify(player));
+  }, [player]);
+
+  useEffect(() => {
+    localStorage.setItem('tm_badges', JSON.stringify(unlockedBadges));
+  }, [unlockedBadges]);
+
+  // Audio mute handler
+  const toggleMute = () => {
+    sounds.muted = !isMuted;
+    setIsMuted(!isMuted);
+  };
+
+  // Active Questions for current level
+  const currentLevelQuestions = useMemo(() => {
+    return QUESTION_BANK.filter(q => q.level === activeLevel);
+  }, [activeLevel]);
+
+  const currentQ = currentLevelQuestions[currentQuestionIdx] || currentLevelQuestions[0];
+
+  // Timer Tick Handler
+  useEffect(() => {
+    let interval = null;
+    if (isTimerActive && timerSeconds > 0) {
+      interval = setInterval(() => {
+        setTimerSeconds(prev => prev - 1);
+      }, 1000);
+    } else if (timerSeconds === 0 && isTimerActive) {
+      setIsTimerActive(false);
+      handleTimeOut();
+    }
+    return () => clearInterval(interval);
+  }, [isTimerActive, timerSeconds]);
+
+  const handleTimeOut = () => {
+    sounds.playWrong();
+    setLives(prev => {
+      const updated = prev - 1;
+      if (updated <= 0) {
+        setFeedbackState({
+          isCorrect: false,
+          message: '⏰ Waktu Habis! Kendaraan Berhenti.',
+          explanation: 'Waktu menjawab telah habis. Coba lagi level ini untuk memperbaiki strategi fisika kamu.'
+        });
+      } else {
+        setFeedbackState({
+          isCorrect: false,
+          message: '⏰ Waktu Habis! Kehilangan 1 Nyawa.',
+          explanation: `Jawaban yang benar adalah ${currentQ.correctAnswer} ${currentQ.unit}. ${currentQ.explanation}`
+        });
+      }
+      return updated;
+    });
+  };
+
+  const startQuestion = (index) => {
+    setCurrentQuestionIdx(index);
+    setSelectedFormula('');
+    setUserAnswer('');
+    setHintsUsedCount(0);
+    setShowHintModal(false);
+    setFeedbackState(null);
+    setVehiclePosition(0);
+    setTimerSeconds(45);
+    setIsTimerActive(true);
+  };
+
+  const handleStartLevel = (levelId) => {
+    setActiveLevel(levelId);
+    setScore(0);
+    setLives(3);
+    setSessionHistory([]);
+    setCurrentQuestionIdx(0);
+    sounds.init();
+    sounds.playEngine();
+    setCurrentPage('game');
+    startQuestion(0);
+  };
+
+  const handleAnswerSubmit = (e) => {
+    if (e) e.preventDefault();
+    if (!currentQ) return;
+
+    sounds.init();
+
+    // Check if formula selection is required for calculation questions
+    if (currentQ.formulaOptions && !selectedFormula) {
+      alert('⚠️ Silakan pilih rumus yang tepat terlebih dahulu!');
+      return;
+    }
+
+    let isCorrect = false;
+
+    if (currentQ.type === 'mc') {
+      isCorrect = userAnswer.trim() === currentQ.correctAnswer.trim();
+    } else {
+      // Numerical calculation validation with slight precision tolerance
+      const numInput = parseFloat(userAnswer.replace(',', '.'));
+      if (isNaN(numInput)) {
+        alert('⚠️ Harap masukkan angka jawaban yang valid!');
+        return;
+      }
+      const targetVal = parseFloat(currentQ.correctAnswer);
+      isCorrect = Math.abs(numInput - targetVal) <= 0.2;
+    }
+
+    setIsTimerActive(false);
+
+    if (isCorrect) {
+      sounds.playCorrect();
+      sounds.playEngine();
+
+      // Animate vehicle moving across road
+      setVehiclePosition(100);
+
+      // Score Calculation
+      let pointsEarned = 100;
+      if (hintsUsedCount === 0) pointsEarned += 50; // Bonus no hints
+      if (timerSeconds > 25) pointsEarned += 25; // Speed bonus
+      if (hintsUsedCount > 0) pointsEarned -= hintsUsedCount * 20;
+
+      setScore(prev => prev + Math.max(pointsEarned, 30));
+
+      setSessionHistory(prev => [...prev, {
+        questionId: currentQ.id,
+        competency: currentQ.competency,
+        isCorrect: true,
+        hintsUsed: hintsUsedCount,
+        timeTaken: 45 - timerSeconds
+      }]);
+
+      setFeedbackState({
+        isCorrect: true,
+        message: '🎉 BENAR! Kendaraan Melaju Tepat!',
+        explanation: `Persamaan: ${selectedFormula || currentQ.correctFormula || ''}\n` +
+                     `Langkah: ${currentQ.explanation}`
+      });
+
+    } else {
+      sounds.playWrong();
+      const nextLives = lives - 1;
+      setLives(nextLives);
+
+      setSessionHistory(prev => [...prev, {
+        questionId: currentQ.id,
+        competency: currentQ.competency,
+        isCorrect: false,
+        hintsUsed: hintsUsedCount,
+        timeTaken: 45 - timerSeconds
+      }]);
+
+      if (nextLives <= 0) {
+        setFeedbackState({
+          isCorrect: false,
+          message: '🔴 BELUM TEPAT! Nyawa Habis.',
+          explanation: `Pembahasan: ${currentQ.explanation}`
+        });
+      } else {
+        setFeedbackState({
+          isCorrect: false,
+          message: '🔴 BELUM TEPAT! Kehilangan 1 Nyawa.',
+          explanation: `Perhatikan hint & petunjuk rumus berikut. Kamu masih memiliki ${nextLives} nyawa!`
+        });
+      }
+    }
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIdx + 1 < currentLevelQuestions.length && lives > 0) {
+      startQuestion(currentQuestionIdx + 1);
+    } else {
+      // Level Completed or Game Over
+      finishLevelSession();
+    }
+  };
+
+  const finishLevelSession = () => {
+    const totalQ = currentLevelQuestions.length;
+    const correctAnswers = sessionHistory.filter(h => h.isCorrect).length;
+    const accuracy = Math.round((correctAnswers / totalQ) * 100);
+
+    // Star calculation
+    let stars = 1;
+    if (accuracy >= 80) stars = 2;
+    if (accuracy >= 90 && lives >= 2) stars = 3;
+
+    // Save player profile updates
+    const newBest = Math.max(player.bestScore || 0, score);
+    const nextUnlock = Math.max(player.highestLevel || 1, activeLevel + 1);
+    const updatedCompleted = Array.from(new Set([...(player.completedLevels || []), activeLevel]));
+
+    // Check Badges
+    const newBadges = [...unlockedBadges];
+    if (activeLevel >= 3 && !newBadges.includes('badge_1')) newBadges.push('badge_1');
+    if (sessionHistory.filter(h => h.isCorrect && h.hintsUsed === 0).length >= 5 && !newBadges.includes('badge_2')) newBadges.push('badge_2');
+    if (activeLevel >= 5 && !newBadges.includes('badge_3')) newBadges.push('badge_3');
+    if (activeLevel >= 6 && !newBadges.includes('badge_4')) newBadges.push('badge_4');
+    if (activeLevel >= 7 && !newBadges.includes('badge_5')) newBadges.push('badge_5');
+    if (updatedCompleted.length >= 8 && !newBadges.includes('badge_6')) newBadges.push('badge_6');
+
+    setUnlockedBadges(newBadges);
+    setPlayer(prev => ({
+      ...prev,
+      bestScore: newBest,
+      highestLevel: nextUnlock > 8 ? 8 : nextUnlock,
+      completedLevels: updatedCompleted
+    }));
+
+    if (stars >= 2) {
+      sounds.playVictory();
+    }
+
+    setCurrentPage('result');
+  };
+
+  if (currentPage === 'loading') {
+    return (
+      <LoadingScreen
+        onComplete={() => {
+          if (player.name) {
+            setCurrentPage('home');
+          } else {
+            setCurrentPage('register');
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-cyan-500 selection:text-slate-950">
+      {/* Top Navbar Header */}
+      <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-lg">
+        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setCurrentPage('home')}>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-400 flex items-center justify-center font-bold text-slate-950 text-xl shadow-md shadow-cyan-500/20">
+            🚦
+          </div>
+          <div>
+            <h1 className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-cyan-400 to-emerald-300 bg-clip-text text-transparent">
+              TRAFFIC MASTER
+            </h1>
+            <p className="text-xs text-slate-400 hidden sm:block">Fisika Gerak Lurus SMP Kelas VIII</p>
+          </div>
+        </div>
+
+        {/* Header Right Status Controls */}
+        <div className="flex items-center space-x-3">
+          {player.name && (
+            <div className="hidden md:flex items-center space-x-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
+              <span className="text-cyan-400 font-semibold">👤 {player.name}</span>
+              <span className="text-slate-500">|</span>
+              <span className="text-amber-400 font-medium">🏆 {player.bestScore || 0} Poin</span>
+            </div>
+          )}
+
+          {/* Mute Audio Toggle Button */}
+          <button
+            onClick={toggleMute}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm text-slate-300 transition-colors"
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+          >
+            {isMuted ? '🔇' : '🔊'}
+          </button>
+
+          {/* Navigation Dropdown / Buttons */}
+          {player.name && (
+            <nav className="flex space-x-1">
+              <button
+                onClick={() => setCurrentPage('home')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${currentPage === 'home' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
+              >
+                🏠 Beranda
+              </button>
+              <button
+                onClick={() => setCurrentPage('level_select')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${currentPage === 'level_select' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
+              >
+                🎮 Level
+              </button>
+              <button
+                onClick={() => setCurrentPage('leaderboard')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${currentPage === 'leaderboard' ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}`}
+              >
+                🏆 Skor
+              </button>
+            </nav>
+          )}
+        </div>
+      </header>
+
+      {/* Main Dynamic Viewport */}
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 flex flex-col justify-center">
+        {currentPage === 'register' && (
+          <RegistrationScreen
+            onRegister={(data) => {
+              setPlayer(prev => ({ ...prev, ...data }));
+              setCurrentPage('home');
+            }}
+          />
+        )}
+
+        {currentPage === 'home' && (
+          <HomeScreen
+            player={player}
+            onNavigate={(page) => setCurrentPage(page)}
+            onStartGame={() => setCurrentPage('level_select')}
+          />
+        )}
+
+        {currentPage === 'tutorial' && (
+          <TutorialScreen onBack={() => setCurrentPage('home')} />
+        )}
+
+        {currentPage === 'level_select' && (
+          <LevelSelectScreen
+            player={player}
+            levels={LEVELS_CONFIG}
+            onSelectLevel={(lvlId) => handleStartLevel(lvlId)}
+            onBack={() => setCurrentPage('home')}
+          />
+        )}
+
+        {currentPage === 'game' && currentQ && (
+          <GameplayScreen
+            levelInfo={LEVELS_CONFIG.find(l => l.id === activeLevel)}
+            question={currentQ}
+            questionIdx={currentQuestionIdx}
+            totalQuestions={currentLevelQuestions.length}
+            score={score}
+            lives={lives}
+            timerSeconds={timerSeconds}
+            selectedFormula={selectedFormula}
+            setSelectedFormula={setSelectedFormula}
+            userAnswer={userAnswer}
+            setUserAnswer={setUserAnswer}
+            hintsUsedCount={hintsUsedCount}
+            setHintsUsedCount={setHintsUsedCount}
+            showHintModal={showHintModal}
+            setShowHintModal={setShowHintModal}
+            feedbackState={feedbackState}
+            vehiclePosition={vehiclePosition}
+            onSubmitAnswer={handleAnswerSubmit}
+            onNextQuestion={handleNextQuestion}
+            onRetryLevel={() => handleStartLevel(activeLevel)}
+            onExit={() => setCurrentPage('level_select')}
+          />
+        )}
+
+        {currentPage === 'result' && (
+          <ResultScreen
+            activeLevel={activeLevel}
+            score={score}
+            sessionHistory={sessionHistory}
+            totalQuestions={currentLevelQuestions.length}
+            lives={lives}
+            onRetry={() => handleStartLevel(activeLevel)}
+            onNextLevel={() => {
+              if (activeLevel < 8) handleStartLevel(activeLevel + 1);
+              else setCurrentPage('level_select');
+            }}
+            onStartRemedial={(weakCompetencies) => {
+              // Prepare remedial questions
+              const remedialSet = QUESTION_BANK.filter(q => weakCompetencies.includes(q.competency)).slice(0, 3);
+              setRemedialQueue(remedialSet.length > 0 ? remedialSet : QUESTION_BANK.slice(0, 3));
+              setIsRemedialActive(true);
+              setCurrentPage('remedial');
+            }}
+            onHome={() => setCurrentPage('home')}
+          />
+        )}
+
+        {currentPage === 'remedial' && (
+          <RemedialScreen
+            questions={remedialQueue}
+            onComplete={() => {
+              alert('🎉 Selamat! Latihan remedial selesai. Pemahamanmu semakin mantap!');
+              setCurrentPage('home');
+            }}
+          />
+        )}
+
+        {currentPage === 'leaderboard' && (
+          <LeaderboardScreen currentPlayer={player} onBack={() => setCurrentPage('home')} />
+        )}
+
+        {currentPage === 'feedback' && (
+          <FeedbackScreen onBack={() => setCurrentPage('home')} />
+        )}
+
+        {currentPage === 'profile' && (
+          <ProfileScreen player={player} unlockedBadges={unlockedBadges} onBack={() => setCurrentPage('home')} />
+        )}
+
+        {currentPage === 'teacher' && (
+          <TeacherDashboardScreen onBack={() => setCurrentPage('home')} />
+        )}
+      </main>
+
+      {/* Footer Branding */}
+      <footer className="border-t border-slate-800 bg-slate-900/50 py-3 text-center text-xs text-slate-500">
+        TRAFFIC MASTER &copy; {new Date().getFullYear()} — Media Pembelajaran Fisika Gerak Lurus SMP Kelas VIII
+      </footer>
+    </div>
+  );
+}
+
+function LoadingScreen({ onComplete }) {
+  const [progress, setProgress] = useState(0);
+  const [lightState, setLightState] = useState('red'); // 'red' | 'yellow' | 'green'
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(timer);
+          setTimeout(onComplete, 400);
+          return 100;
+        }
+        const next = prev + 5;
+        if (next > 30 && next < 70) setLightState('yellow');
+        if (next >= 70) setLightState('green');
+        return next;
+      });
+    }, 80);
+    return () => clearInterval(timer);
+  }, [onComplete]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+      {/* City Silhouette Graphic Background */}
+      <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-cyan-950/20 to-transparent pointer-events-none" />
+
+      {/* Traffic Light Animation Widget */}
+      <div className="bg-slate-900 border-2 border-slate-700 p-4 rounded-3xl flex flex-col space-y-3 shadow-2xl shadow-cyan-500/10 mb-6">
+        <div className={`w-8 h-8 rounded-full transition-all duration-300 ${lightState === 'red' ? 'bg-red-500 shadow-lg shadow-red-500/80 scale-110' : 'bg-red-950/50'}`} />
+        <div className={`w-8 h-8 rounded-full transition-all duration-300 ${lightState === 'yellow' ? 'bg-amber-400 shadow-lg shadow-amber-400/80 scale-110' : 'bg-amber-950/50'}`} />
+        <div className={`w-8 h-8 rounded-full transition-all duration-300 ${lightState === 'green' ? 'bg-emerald-400 shadow-lg shadow-emerald-400/80 scale-110' : 'bg-emerald-950/50'}`} />
+      </div>
+
+      <h1 className="text-4xl sm:text-5xl font-black bg-gradient-to-r from-cyan-400 via-emerald-300 to-amber-300 bg-clip-text text-transparent mb-2">
+        TRAFFIC MASTER
+      </h1>
+      <p className="text-sm sm:text-base text-slate-400 max-w-md italic mb-8">
+        "Hitung Tepat, Atur Laju, Menangkan Perjalanan!"
+      </p>
+
+      {/* Animated Vehicle & Progress Bar */}
+      <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-4 rounded-2xl relative overflow-hidden">
+        <div className="relative h-10 w-full mb-3 bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex items-center px-2">
+          {/* Moving Car Graphic */}
+          <div
+            className="absolute transition-all duration-150 ease-out text-2xl"
+            style={{ left: `calc(${progress}% - 28px)` }}
+          >
+            🚗
+          </div>
+          <div className="w-full flex justify-end pr-3">
+            <span className="text-xs font-bold text-slate-500">🏁 FINISH</span>
+          </div>
+        </div>
+
+        <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full transition-all duration-150 rounded-full"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        <div className="flex justify-between items-center mt-2 text-xs text-slate-400 font-mono">
+          <span>Menyiapkan Simulator Fisika...</span>
+          <span className="font-bold text-cyan-400">{progress}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RegistrationScreen({ onRegister }) {
+  const [name, setName] = useState('');
+  const [playerClass, setPlayerClass] = useState('8A');
+  const [absen, setAbsen] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name.trim()) return alert('Mohon isi nama kamu!');
+    if (!absen) return alert('Mohon isi nomor absen kamu!');
+    onRegister({ name: name.trim(), playerClass, absen });
+  };
+
+  return (
+    <div className="max-w-md w-full mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl relative">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 bg-gradient-to-tr from-cyan-500 to-emerald-400 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 shadow-lg shadow-cyan-500/20">
+          🚦
+        </div>
+        <h2 className="text-2xl font-black text-slate-100">Registrasi Pemain</h2>
+        <p className="text-xs text-slate-400 mt-1">Masukkan data dirimu untuk memulai tantangan Fisika</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+            Nama Lengkap / Panggilan
+          </label>
+          <input
+            type="text"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Contoh: Budi Santoso"
+            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all text-sm"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              Kelas
+            </label>
+            <select
+              value={playerClass}
+              onChange={(e) => setPlayerClass(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all text-sm"
+            >
+              <option value="8A">Kelas 8A</option>
+              <option value="8B">Kelas 8B</option>
+              <option value="8C">Kelas 8C</option>
+              <option value="8D">Kelas 8D</option>
+              <option value="8E">Kelas 8E</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1">
+              No. Absen
+            </label>
+            <input
+              type="number"
+              required
+              min="1"
+              max="50"
+              value={absen}
+              onChange={(e) => setAbsen(e.target.value)}
+              placeholder="Contoh: 12"
+              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all text-sm"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full mt-4 bg-gradient-to-r from-cyan-500 to-emerald-400 hover:from-cyan-400 hover:to-emerald-300 text-slate-950 font-extrabold py-3.5 px-6 rounded-xl shadow-lg shadow-cyan-500/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0 text-base"
+        >
+          🚦 MULAI BERMAIN
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function HomeScreen({ player, onNavigate, onStartGame }) {
+  const completedCount = player.completedLevels?.length || 0;
+  const progressPercent = Math.round((completedCount / 8) * 100);
+
+  return (
+    <div className="space-y-6">
+      {/* Welcome Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 -mt-6 -mr-6 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
+          <div>
+            <div className="inline-flex items-center space-x-2 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 px-3 py-1 rounded-full text-xs font-semibold mb-3">
+              <span>🚦 Traffic Controller Active</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-100">
+              Halo, <span className="bg-gradient-to-r from-cyan-400 to-emerald-300 bg-clip-text text-transparent">{player.name || 'Master'}</span>!
+            </h2>
+            <p className="text-slate-400 text-sm mt-1">
+              Kelas: <span className="text-slate-200 font-semibold">{player.playerClass || '8A'}</span> | No. Absen: <span className="text-slate-200 font-semibold">{player.absen || '0'}</span>
+            </p>
+          </div>
+
+          {/* Quick Score Card */}
+          <div className="flex items-center space-x-4 bg-slate-950/80 border border-slate-800 px-5 py-3.5 rounded-2xl">
+            <div className="text-3xl">🏆</div>
+            <div>
+              <p className="text-xs text-slate-400 uppercase font-semibold">Skor Terbaik</p>
+              <p className="text-2xl font-black text-amber-400">{player.bestScore || 0}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Level Completion Progress Bar */}
+        <div className="mt-6 pt-6 border-t border-slate-800/80">
+          <div className="flex justify-between items-center text-xs text-slate-400 mb-2">
+            <span>Kemajuan Misi Gerak Lurus</span>
+            <span className="font-bold text-emerald-400">{completedCount} dari 8 Level Selesai ({progressPercent}%)</span>
+          </div>
+          <div className="w-full bg-slate-950 rounded-full h-3 overflow-hidden border border-slate-800">
+            <div
+              className="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full rounded-full transition-all duration-500"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Navigation Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <button
+          onClick={onStartGame}
+          className="bg-gradient-to-br from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 p-6 rounded-3xl font-black text-xl flex flex-col justify-between shadow-lg shadow-cyan-500/20 transition-transform transform hover:-translate-y-1 text-left group"
+        >
+          <div className="flex justify-between items-center w-full mb-6">
+            <span className="text-4xl">🚗</span>
+            <span className="text-2xl group-hover:translate-x-1 transition-transform">➔</span>
+          </div>
+          <div>
+            <h3 className="text-2xl font-black">MULAI BERMAIN</h3>
+            <p className="text-xs font-medium text-slate-900/80 mt-1">Pilih level dan atur lalu lintas kota</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate('tutorial')}
+          className="bg-slate-900 hover:bg-slate-800 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between transition-transform transform hover:-translate-y-1 text-left"
+        >
+          <div className="text-3xl mb-4">📚</div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">Cara Bermain & Rumus</h3>
+            <p className="text-xs text-slate-400 mt-1">Panduan konsep GLB, GLBB & konversi</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate('leaderboard')}
+          className="bg-slate-900 hover:bg-slate-800 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between transition-transform transform hover:-translate-y-1 text-left"
+        >
+          <div className="text-3xl mb-4">🏆</div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">Papan Skor</h3>
+            <p className="text-xs text-slate-400 mt-1">Lihat peringkat skor tertinggi siswa</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate('profile')}
+          className="bg-slate-900 hover:bg-slate-800 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between transition-transform transform hover:-translate-y-1 text-left"
+        >
+          <div className="text-3xl mb-4">👤</div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">Profil & Badge</h3>
+            <p className="text-xs text-slate-400 mt-1">Koleksi pencapaian dan lencana</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate('feedback')}
+          className="bg-slate-900 hover:bg-slate-800 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between transition-transform transform hover:-translate-y-1 text-left"
+        >
+          <div className="text-3xl mb-4">💬</div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-100">Umpan Balik</h3>
+            <p className="text-xs text-slate-400 mt-1">Kirim pendapat tentang game ini</p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate('teacher')}
+          className="bg-slate-900/60 hover:bg-slate-900 border border-cyan-500/30 p-6 rounded-3xl flex flex-col justify-between transition-transform transform hover:-translate-y-1 text-left"
+        >
+          <div className="text-3xl mb-4">👨‍🏫</div>
+          <div>
+            <h3 className="text-lg font-bold text-cyan-400">Dashboard Guru</h3>
+            <p className="text-xs text-slate-400 mt-1">Analisis ketuntasan siswa & nilai</p>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TutorialScreen({ onBack }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-slate-100 flex items-center gap-2">
+          <span>📚</span> Cara Bermain & Ringkasan Rumus
+        </h2>
+        <button
+          onClick={onBack}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+        >
+          ← Kembali
+        </button>
+      </div>
+
+      {/* Rules Stepper */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center justify-center font-bold mb-2">1</div>
+          <h4 className="font-bold text-sm text-slate-200">Baca Situasi</h4>
+          <p className="text-xs text-slate-400 mt-1">Identifikasi informasi besaran fisika yang diketahui dalam soal.</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center justify-center font-bold mb-2">2</div>
+          <h4 className="font-bold text-sm text-slate-200">Pilih Rumus</h4>
+          <p className="text-xs text-slate-400 mt-1">Tentukan persamaan yang sesuai (misal: v = s/t atau s = v×t).</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="w-8 h-8 bg-cyan-500/20 text-cyan-400 rounded-lg flex items-center justify-center font-bold mb-2">3</div>
+          <h4 className="font-bold text-sm text-slate-200">Hitung & Jawab</h4>
+          <p className="text-xs text-slate-400 mt-1">Masukkan hasil perhitungan angka dengan tepat sebelum waktu habis.</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <div className="w-8 h-8 bg-emerald-500/20 text-emerald-400 rounded-lg flex items-center justify-center font-bold mb-2">4</div>
+          <h4 className="font-bold text-sm text-slate-200">Melaju & Skor</h4>
+          <p className="text-xs text-slate-400 mt-1">Kendaraan melaju di jalan raya dan kamu mendapatkan bonus poin!</p>
+        </div>
+      </div>
+
+      {/* Physics Formulas Reference Cards */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+        <h3 className="text-lg font-bold text-cyan-400 border-b border-slate-800 pb-3">
+          📐 Rumus Utama Gerak Lurus (Fisika Kelas VIII SMP)
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs font-bold text-amber-400 uppercase">Kelajuan & Kecepatan</span>
+            <div className="text-xl font-black text-slate-100 my-2 font-mono bg-slate-900 p-2 rounded-lg text-center border border-slate-800">
+              v = s / t
+            </div>
+            <p className="text-xs text-slate-400">
+              v = Kelajuan (m/s)<br />
+              s = Jarak (m)<br />
+              t = Waktu (s)
+            </p>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs font-bold text-cyan-400 uppercase">Konversi Satuan</span>
+            <div className="text-sm font-bold text-slate-100 my-2 font-mono bg-slate-900 p-2 rounded-lg text-center border border-slate-800">
+              1 m/s = 3,6 km/jam<br />
+              1 km/jam = 1/3,6 m/s
+            </div>
+            <p className="text-xs text-slate-400">
+              Contoh: 72 km/jam = 72 / 3,6 = 20 m/s.
+            </p>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
+            <span className="text-xs font-bold text-emerald-400 uppercase">GLBB (Percepatan)</span>
+            <div className="text-sm font-bold text-slate-100 my-2 font-mono bg-slate-900 p-2 rounded-lg text-center border border-slate-800">
+              vt = v0 + (a × t)<br />
+              s = (v0 × t) + ½a t²
+            </div>
+            <p className="text-xs text-slate-400">
+              a = Percepatan (m/s²)<br />
+              vt = Kecepatan akhir (m/s)
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LevelSelectScreen({ player, levels, onSelectLevel, onBack }) {
+  const highestUnlocked = player.highestLevel || 1;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-slate-100">🚦 Pilih Misi Perjalanan</h2>
+          <p className="text-xs text-slate-400">Selesaikan setiap level untuk membuka rute selanjutnya</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+        >
+          ← Beranda
+        </button>
+      </div>
+
+      {/* Grid of 8 Levels */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {levels.map((lvl) => {
+          const isUnlocked = lvl.id <= highestUnlocked;
+          const isCompleted = player.completedLevels?.includes(lvl.id);
+
+          return (
+            <div
+              key={lvl.id}
+              className={`rounded-3xl p-5 border flex flex-col justify-between transition-all relative overflow-hidden ${
+                isUnlocked
+                  ? 'bg-slate-900 border-slate-800 hover:border-cyan-500/50 hover:shadow-lg hover:shadow-cyan-500/10'
+                  : 'bg-slate-950/60 border-slate-800/50 opacity-60'
+              }`}
+            >
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <span className={`text-xs font-extrabold px-2.5 py-1 rounded-full ${
+                    isUnlocked ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' : 'bg-slate-800 text-slate-500'
+                  }`}>
+                    {lvl.difficulty}
+                  </span>
+                  {isCompleted && (
+                    <span className="text-amber-400 text-sm">⭐⭐⭐</span>
+                  )}
+                </div>
+
+                <h3 className="font-extrabold text-base text-slate-100 mb-1">{lvl.title}</h3>
+                <p className="text-xs text-cyan-400 font-semibold mb-2">{lvl.topic}</p>
+                <p className="text-xs text-slate-400 line-clamp-2">{lvl.desc}</p>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-slate-800">
+                {isUnlocked ? (
+                  <button
+                    onClick={() => onSelectLevel(lvl.id)}
+                    className="w-full bg-gradient-to-r from-cyan-500 to-emerald-400 hover:from-cyan-400 hover:to-emerald-300 text-slate-950 font-bold py-2.5 px-4 rounded-xl text-xs transition-transform transform active:scale-95 shadow-md shadow-cyan-500/20"
+                  >
+                    🚀 MAIN LEVEL {lvl.id}
+                  </button>
+                ) : (
+                  <div className="w-full bg-slate-950 text-slate-500 font-semibold py-2.5 px-4 rounded-xl text-xs text-center border border-slate-800 flex items-center justify-center space-x-1">
+                    <span>🔒 Lock</span>
+                    <span className="text-[10px]"> (Selesaikan Level {lvl.id - 1})</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GameplayScreen({
+  levelInfo, question, questionIdx, totalQuestions, score, lives, timerSeconds,
+  selectedFormula, setSelectedFormula, userAnswer, setUserAnswer,
+  hintsUsedCount, setHintsUsedCount, showHintModal, setShowHintModal,
+  feedbackState, vehiclePosition, onSubmitAnswer, onNextQuestion, onRetryLevel, onExit
+}) {
+  return (
+    <div className="space-y-4 max-w-4xl mx-auto w-full">
+      {/* Top Gameplay Bar: Score, Lives, Timer */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onExit}
+            className="text-slate-400 hover:text-slate-200 text-xs font-bold bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"
+          >
+            ✕ Keluar
+          </button>
+          <div>
+            <h3 className="text-xs font-bold text-cyan-400">{levelInfo?.title}</h3>
+            <p className="text-xs text-slate-400 font-mono">Soal {questionIdx + 1} / {totalQuestions}</p>
+          </div>
+        </div>
+
+        {/* Lives Heart Display */}
+        <div className="flex items-center space-x-1 text-lg">
+          {[1, 2, 3].map(heart => (
+            <span key={heart} className={`transition-all ${heart <= lives ? 'scale-100 opacity-100' : 'scale-75 opacity-20 grayscale'}`}>
+              ❤️
+            </span>
+          ))}
+        </div>
+
+        {/* Timer & Score Display */}
+        <div className="flex items-center space-x-4">
+          <div className={`px-3 py-1 rounded-lg border text-xs font-mono font-bold flex items-center space-x-1 ${
+            timerSeconds <= 10 ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse' : 'bg-slate-950 border-slate-800 text-emerald-400'
+          }`}>
+            <span>⏱️</span>
+            <span>00:{timerSeconds < 10 ? `0${timerSeconds}` : timerSeconds}</span>
+          </div>
+
+          <div className="bg-amber-400/10 border border-amber-400/30 px-3 py-1 rounded-lg text-amber-400 font-bold text-xs font-mono">
+            {score} Pts
+          </div>
+        </div>
+      </div>
+
+      {/* Interactive Visual City Road Canvas Visualizer */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 relative overflow-hidden shadow-xl">
+        {/* Scenery Background Icons */}
+        <div className="flex justify-between items-end px-6 text-slate-700 text-2xl mb-1 pointer-events-none">
+          <span>🏢</span>
+          <span>🏙️</span>
+          <span>🪧 (Rambu)</span>
+          <span>🏬</span>
+          <span>🏁 FINISH</span>
+        </div>
+
+        {/* Asphalt Road Canvas */}
+        <div className="h-16 bg-slate-950 border-y-2 border-slate-700 relative flex items-center px-4 overflow-hidden rounded-xl">
+          {/* Dashed Road Lanes */}
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-b-2 border-dashed border-slate-600/50 w-full pointer-events-none" />
+
+          {/* Dynamic Moving Vehicle */}
+          <div
+            className="absolute transition-all duration-700 ease-out text-3xl z-10 filter drop-shadow-[0_4px_8px_rgba(6,182,212,0.5)]"
+            style={{ left: `calc(${Math.min(vehiclePosition, 90)}% + 8px)` }}
+          >
+            🚗
+          </div>
+        </div>
+      </div>
+
+      {/* Question Card & Input Form */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl relative space-y-5">
+        <div>
+          <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-md">
+            Misi Fisika #{questionIdx + 1}
+          </span>
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-100 mt-3 leading-relaxed">
+            {question.question}
+          </h2>
+        </div>
+
+        {/* Known Variables Badge List */}
+        {question.known && (
+          <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-2xl flex flex-wrap gap-2 items-center">
+            <span className="text-xs font-bold text-slate-400 mr-2">📌 Diketahui:</span>
+            {question.known.map((k, idx) => (
+              <span key={idx} className="bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1 rounded-lg text-xs font-mono">
+                {k}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Formula Selection Buttons (if applicable) */}
+        {question.formulaOptions && (
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-amber-400 uppercase tracking-wider">
+              1. Pilih Rumus Yang Tepat:
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {question.formulaOptions.map((formula, fIdx) => (
+                <button
+                  key={fIdx}
+                  type="button"
+                  onClick={() => setSelectedFormula(formula)}
+                  className={`py-2.5 px-4 rounded-xl text-xs font-mono font-bold border transition-all ${
+                    selectedFormula === formula
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md shadow-amber-400/20 scale-[1.02]'
+                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  {formula}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Answer Input Section */}
+        <form onSubmit={onSubmitAnswer} className="space-y-4 pt-2">
+          {question.type === 'mc' ? (
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                Pilih Jawaban Yang Benar:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {question.options.map((opt, oIdx) => (
+                  <button
+                    key={oIdx}
+                    type="button"
+                    onClick={() => setUserAnswer(opt)}
+                    className={`p-3.5 rounded-xl text-xs font-semibold text-left border transition-all ${
+                      userAnswer === opt
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/20 font-bold'
+                        : 'bg-slate-950 text-slate-200 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-cyan-400 uppercase tracking-wider">
+                2. Hitung & Masukkan Jawaban Angka:
+              </label>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="number"
+                  step="any"
+                  value={userAnswer}
+                  onChange={(e) => setUserAnswer(e.target.value)}
+                  placeholder="Masukkan angka..."
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 font-mono text-base focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                />
+                <span className="bg-slate-800 border border-slate-700 text-cyan-400 font-mono font-bold px-4 py-3 rounded-xl text-sm">
+                  {question.unit || 'm/s'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Action Row: Hint & Submit Button */}
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => {
+                if (hintsUsedCount < question.hints.length) {
+                  setHintsUsedCount(prev => prev + 1);
+                }
+                setShowHintModal(true);
+              }}
+              className="bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 border border-amber-400/30 px-4 py-3 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors"
+            >
+              <span>💡 HINT ({hintsUsedCount}/{question.hints?.length || 3})</span>
+            </button>
+
+            <button
+              type="submit"
+              disabled={!userAnswer}
+              className={`flex-1 py-3 px-6 rounded-xl font-extrabold text-sm transition-all shadow-lg ${
+                userAnswer
+                  ? 'bg-gradient-to-r from-cyan-500 to-emerald-400 hover:from-cyan-400 hover:to-emerald-300 text-slate-950 shadow-cyan-500/20 transform active:scale-95'
+                  : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+              }`}
+            >
+              🚦 JAWAB & LAJU
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Progressive Hint Modal Overlay */}
+      {showHintModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-amber-400/40 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-extrabold text-amber-400 text-base flex items-center gap-2">
+                <span>💡 Petunjuk Fisika (Hint #{hintsUsedCount})</span>
+              </h3>
+              <button
+                onClick={() => setShowHintModal(false)}
+                className="text-slate-400 hover:text-slate-100 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {question.hints.slice(0, hintsUsedCount).map((hText, hIdx) => (
+                <div key={hIdx} className="bg-amber-400/10 border border-amber-400/20 p-3 rounded-xl text-xs text-amber-200">
+                  <span className="font-bold text-amber-400">Hint {hIdx + 1}: </span> {hText}
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-slate-400 italic"> Catatan: Penggunaan hint mengurangi 20 poin bonus.</p>
+
+            <button
+              onClick={() => setShowHintModal(false)}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl text-xs"
+            >
+              Paham, Lanjutkan Perhitungan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Overlay Banner (Correct / Incorrect Step-by-step) */}
+      {feedbackState && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className={`bg-slate-900 border-2 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-4 ${
+            feedbackState.isCorrect ? 'border-emerald-500/80 shadow-emerald-500/20' : 'border-red-500/80 shadow-red-500/20'
+          }`}>
+            <div className="text-center space-y-2">
+              <div className="text-5xl">{feedbackState.isCorrect ? '🟢' : '🔴'}</div>
+              <h3 className={`text-2xl font-black ${feedbackState.isCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
+                {feedbackState.message}
+              </h3>
+            </div>
+
+            <div className="bg-slate-950 border border-slate-800 p-4 rounded-2xl text-xs text-slate-300 font-mono whitespace-pre-line leading-relaxed">
+              {feedbackState.explanation}
+            </div>
+
+            <div className="pt-2">
+              {lives <= 0 ? (
+                <button
+                  onClick={onRetryLevel}
+                  className="w-full bg-gradient-to-r from-red-500 to-amber-500 text-slate-950 font-extrabold py-3.5 px-6 rounded-xl text-sm shadow-lg shadow-red-500/25"
+                >
+                  🔄 COBA LAGI LEVEL INI
+                </button>
+              ) : (
+                <button
+                  onClick={onNextQuestion}
+                  className="w-full bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 font-extrabold py-3.5 px-6 rounded-xl text-sm shadow-lg shadow-cyan-500/25"
+                >
+                  ➔ LANJUTKAN KE SOAL BERIKUTNYA
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResultScreen({ activeLevel, score, sessionHistory, totalQuestions, lives, onRetry, onNextLevel, onStartRemedial, onHome }) {
+  const correctCount = sessionHistory.filter(h => h.isCorrect).length;
+  const accuracy = Math.round((correctCount / totalQuestions) * 100);
+
+  // Calculate Stars
+  let stars = 1;
+  if (accuracy >= 80) stars = 2;
+  if (accuracy >= 90 && lives >= 2) stars = 3;
+
+  // Group competencies
+  const weakCompetencies = useMemo(() => {
+    const map = {};
+    sessionHistory.forEach(h => {
+      if (!map[h.competency]) map[h.competency] = { correct: 0, total: 0 };
+      map[h.competency].total += 1;
+      if (h.isCorrect) map[h.competency].correct += 1;
+    });
+    return Object.keys(map).filter(comp => (map[comp].correct / map[comp].total) < 0.7);
+  }, [sessionHistory]);
+
+  return (
+    <div className="max-w-xl mx-auto w-full space-y-6 text-center">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+        <div className="text-5xl mb-3">🎉</div>
+        <h2 className="text-3xl font-black text-slate-100">LEVEL SELESAI!</h2>
+        <p className="text-xs text-slate-400 mt-1">Hasil Performa Misi Fisika Level {activeLevel}</p>
+
+        {/* Stars Display */}
+        <div className="text-4xl my-4 space-x-2">
+          {['⭐', '⭐', '⭐'].map((star, idx) => (
+            <span key={idx} className={idx < stars ? 'opacity-100 scale-110 inline-block' : 'opacity-20 grayscale inline-block'}>
+              {star}
+            </span>
+          ))}
+        </div>
+
+        {/* Metric Summary Grid */}
+        <div className="grid grid-cols-3 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 my-6">
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase">Total Skor</p>
+            <p className="text-xl font-black text-amber-400">{score}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase">Akurasi</p>
+            <p className="text-xl font-black text-cyan-400">{accuracy}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase">Benar</p>
+            <p className="text-xl font-black text-emerald-400">{correctCount}/{totalQuestions}</p>
+          </div>
+        </div>
+
+        {/* Adaptive Feedback Recommendation */}
+        <div className="bg-cyan-500/10 border border-cyan-500/30 p-4 rounded-2xl text-left text-xs text-cyan-200 mb-6 space-y-1">
+          <p className="font-bold text-cyan-400">💡 Rekomendasi Pembelajaran Adaptive:</p>
+          {accuracy >= 80 ? (
+            <p>Pemahamanmu tentang konsep gerak lurus dan kelajuan sudah sangat prima! Siap menaklukkan tantangan berikutnya.</p>
+          ) : (
+            <p>Kamu masih perlu melatih pemilihan rumus dan konversi satuan. Gunakan sesi remedial untuk memperkuat pemahaman.</p>
+          )}
+        </div>
+
+        {/* Remedial Offer if needed */}
+        {weakCompetencies.length > 0 && (
+          <div className="bg-amber-400/10 border border-amber-400/30 p-4 rounded-2xl text-left text-xs mb-6 space-y-2">
+            <p className="font-bold text-amber-400">⚠️ Butuh Latihan Remedial?</p>
+            <p className="text-amber-200">Kamu memiliki beberapa kesalahan pada materi ({weakCompetencies.join(', ')}).</p>
+            <button
+              onClick={() => onStartRemedial(weakCompetencies)}
+              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs"
+            >
+              🔄 COBA LATIHAN REMEDIAL (3 SOAL)
+            </button>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={onRetry}
+            className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 px-4 rounded-xl text-xs border border-slate-700"
+          >
+            🔄 ULANGI LEVEL
+          </button>
+          {activeLevel < 8 && (
+            <button
+              onClick={onNextLevel}
+              className="flex-1 bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 font-extrabold py-3 px-4 rounded-xl text-xs shadow-lg shadow-cyan-500/20"
+            >
+              🚀 LANJUT LEVEL {activeLevel + 1}
+            </button>
+          )}
+          <button
+            onClick={onHome}
+            className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-3 px-4 rounded-xl text-xs border border-slate-700"
+          >
+            🏠 BERANDA
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RemedialScreen({ questions, onComplete }) {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [selectedAns, setSelectedAns] = useState('');
+  const [isDone, setIsDone] = useState(false);
+
+  const q = questions[currentIdx];
+
+  const handleNext = () => {
+    if (currentIdx + 1 < questions.length) {
+      setCurrentIdx(prev => prev + 1);
+      setSelectedAns('');
+    } else {
+      setIsDone(true);
+    }
+  };
+
+  if (isDone) {
+    return (
+      <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4">
+        <div className="text-4xl">🌟</div>
+        <h3 className="text-xl font-black text-emerald-400">Remedial Selesai!</h3>
+        <p className="text-xs text-slate-300">Pemahamanmu terhadap konsep fisika kini sudah lebih kuat.</p>
+        <button
+          onClick={onComplete}
+          className="w-full bg-cyan-500 text-slate-950 font-bold py-3 rounded-xl text-xs"
+        >
+          KEMBALI KE PERMAINAN UTAMA
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+      <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+        <span className="text-xs font-bold text-amber-400">🔄 Mode Remedial ({currentIdx + 1}/{questions.length})</span>
+        <span className="text-xs text-slate-400 font-semibold">{q.competency}</span>
+      </div>
+
+      <h3 className="font-bold text-slate-100 text-sm">{q.question}</h3>
+
+      {q.options ? (
+        <div className="space-y-2">
+          {q.options.map((opt, i) => (
+            <button
+              key={i}
+              onClick={() => setSelectedAns(opt)}
+              className={`w-full text-left p-3 rounded-xl text-xs font-medium border ${
+                selectedAns === opt ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-300 border-slate-800'
+              }`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <input
+          type="number"
+          value={selectedAns}
+          onChange={(e) => setSelectedAns(e.target.value)}
+          placeholder="Masukkan nilai angka..."
+          className="w-full bg-slate-950 border border-slate-700 p-3 rounded-xl text-xs font-mono text-slate-100"
+        />
+      )}
+
+      <button
+        onClick={handleNext}
+        disabled={!selectedAns}
+        className="w-full bg-emerald-400 text-slate-950 font-extrabold py-3 rounded-xl text-xs shadow-md shadow-emerald-500/20"
+      >
+        JAWAB & LANJUT
+      </button>
+    </div>
+  );
+}
+
+function LeaderboardScreen({ currentPlayer, onBack }) {
+  const [filterClass, setFilterClass] = useState('Semua');
+
+  // Mock Leaderboard Data with current player integrated
+  const mockLeaderboard = useMemo(() => {
+    const defaultList = [
+      { name: 'Andi Pratama', class: '8A', score: 950 },
+      { name: 'Siti Rahma', class: '8B', score: 910 },
+      { name: 'Budi Santoso', class: '8A', score: 870 },
+      { name: 'Rina Wijaya', class: '8C', score: 820 },
+      { name: 'Dimas Kurnia', class: '8B', score: 790 },
+      { name: 'Eka Putri', class: '8D', score: 740 },
+    ];
+
+    if (currentPlayer?.name) {
+      defaultList.push({
+        name: currentPlayer.name,
+        class: currentPlayer.playerClass || '8A',
+        score: currentPlayer.bestScore || 0
+      });
+    }
+
+    // Sort descending
+    return defaultList
+      .sort((a, b) => b.score - a.score)
+      .filter(item => filterClass === 'Semua' || item.class === filterClass);
+  }, [currentPlayer, filterClass]);
+
+  return (
+    <div className="space-y-6 max-w-3xl mx-auto w-full">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-slate-100 flex items-center gap-2">
+            <span>🏆</span> Papan Skor Traffic Master
+          </h2>
+          <p className="text-xs text-slate-400">Peringkat nilai tertinggi siswa SMP</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+        >
+          ← Beranda
+        </button>
+      </div>
+
+      {/* Class Filter Tabs */}
+      <div className="flex space-x-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
+        {['Semua', '8A', '8B', '8C', '8D'].map(cls => (
+          <button
+            key={cls}
+            onClick={() => setFilterClass(cls)}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+              filterClass === cls ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            {cls === 'Semua' ? 'Semua Kelas' : `Kelas ${cls}`}
+          </button>
+        ))}
+      </div>
+
+      {/* Leaderboard Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+        <div className="divide-y divide-slate-800">
+          {mockLeaderboard.map((item, idx) => {
+            const isSelf = currentPlayer?.name && item.name === currentPlayer.name;
+            return (
+              <div
+                key={idx}
+                className={`p-4 flex items-center justify-between transition-colors ${
+                  isSelf ? 'bg-cyan-500/10 border-l-4 border-l-cyan-400' : 'hover:bg-slate-800/50'
+                }`}
+              >
+                <div className="flex items-center space-x-4">
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${
+                    idx === 0 ? 'bg-amber-400 text-slate-950' :
+                    idx === 1 ? 'bg-slate-300 text-slate-950' :
+                    idx === 2 ? 'bg-amber-700 text-slate-100' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {idx + 1}
+                  </span>
+
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                      {item.name}
+                      {isSelf && <span className="bg-cyan-500 text-slate-950 text-[10px] px-2 py-0.5 rounded-full font-extrabold">Kamu</span>}
+                    </h4>
+                    <p className="text-xs text-slate-400">Kelas {item.class}</p>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="font-mono font-black text-amber-400 text-lg">{item.score}</span>
+                  <span className="text-xs text-slate-500 ml-1">Pts</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileScreen({ player, unlockedBadges, onBack }) {
+  return (
+    <div className="space-y-6 max-w-4xl mx-auto w-full">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-slate-100 flex items-center gap-2">
+          <span>👤</span> Profil Pemain & Koleksi Badge
+        </h2>
+        <button
+          onClick={onBack}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+        >
+          ← Beranda
+        </button>
+      </div>
+
+      {/* Profile Info Header */}
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl">
+        <div className="flex items-center space-x-4">
+          <div className="w-16 h-16 bg-gradient-to-tr from-cyan-500 to-emerald-400 rounded-2xl flex items-center justify-center text-3xl font-bold text-slate-950">
+            🚦
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-slate-100">{player.name || 'Siswa SMP'}</h3>
+            <p className="text-xs text-slate-400">Kelas {player.playerClass || '8A'} | Absen #{player.absen || '0'}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 w-full sm:w-auto">
+          <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Skor Terbaik</span>
+            <p className="text-lg font-black text-amber-400">{player.bestScore || 0}</p>
+          </div>
+          <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 text-center">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Level Tertinggi</span>
+            <p className="text-lg font-black text-cyan-400">Level {player.highestLevel || 1}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Badges Gallery */}
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 shadow-xl">
+        <h3 className="text-lg font-bold text-cyan-400 border-b border-slate-800 pb-3">
+          🏅 Badges & Pencapaian Master ({unlockedBadges.length} / {BADGES.length})
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {BADGES.map(b => {
+            const isUnlocked = unlockedBadges.includes(b.id);
+
+            return (
+              <div
+                key={b.id}
+                className={`p-4 rounded-2xl border flex items-start space-x-3 transition-all ${
+                  isUnlocked
+                    ? 'bg-slate-950 border-amber-400/40 shadow-lg shadow-amber-400/5'
+                    : 'bg-slate-950/40 border-slate-800 opacity-50 grayscale'
+                }`}
+              >
+                <div className="text-3xl p-2 bg-slate-900 rounded-xl border border-slate-800">
+                  {b.icon}
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-100 flex items-center gap-1">
+                    {b.name}
+                    {!isUnlocked && <span className="text-[10px] text-slate-500">🔒</span>}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1">{b.desc}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeedbackScreen({ onBack }) {
+  const [rating, setRating] = useState(5);
+  const [favParts, setFavParts] = useState([]);
+  const [comment, setComment] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const toggleFav = (part) => {
+    setFavParts(prev => prev.includes(part) ? prev.filter(p => p !== part) : [...prev, part]);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const existing = JSON.parse(localStorage.getItem('tm_feedback') || '[]');
+    existing.push({ rating, favParts, comment, date: new Date().toISOString() });
+    localStorage.setItem('tm_feedback', JSON.stringify(existing));
+    setSubmitted(true);
+  };
+
+  if (submitted) {
+    return (
+      <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-4">
+        <div className="text-4xl">💌</div>
+        <h3 className="text-xl font-black text-emerald-400">Terima Kasih!</h3>
+        <p className="text-xs text-slate-300">Umpan balikmu sangat berharga untuk pengembangan Traffic Master.</p>
+        <button
+          onClick={onBack}
+          className="w-full bg-cyan-500 text-slate-950 font-bold py-3 rounded-xl text-xs"
+        >
+          KEMBALI KE BERANDA
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-xl mx-auto w-full space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-slate-100 flex items-center gap-2">
+          <span>💬</span> Umpan Balik Pemain
+        </h2>
+        <button
+          onClick={onBack}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+        >
+          ← Beranda
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-5 shadow-xl">
+        <div>
+          <label className="block text-xs font-bold text-slate-300 uppercase mb-2">
+            Seberapa menarik game ini untuk belajar Fisika?
+          </label>
+          <div className="flex space-x-2 text-2xl">
+            {[1, 2, 3, 4, 5].map(star => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                className={`transition-transform ${star <= rating ? 'scale-110 opacity-100' : 'opacity-30 grayscale'}`}
+              >
+                ⭐
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-300 uppercase mb-2">
+            Bagian mana yang paling kamu sukai?
+          </label>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {['Animasi Mobil 🚗', 'Menghitung Rumus 📐', 'Tantangan Level 🚀', 'Papan Skor 🏆'].map(part => (
+              <button
+                key={part}
+                type="button"
+                onClick={() => toggleFav(part)}
+                className={`p-3 rounded-xl text-left font-semibold border ${
+                  favParts.includes(part) ? 'bg-cyan-500 text-slate-950 border-cyan-400' : 'bg-slate-950 text-slate-300 border-slate-800'
+                }`}
+              >
+                {part}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-300 uppercase mb-2">
+            Pesan & Saran Tambahan:
+          </label>
+          <textarea
+            rows="3"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Tulis pendapatmu di sini..."
+            className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="w-full bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 font-extrabold py-3.5 rounded-xl text-xs shadow-lg shadow-cyan-500/20"
+        >
+          🚀 KIRIM FEEDBACK
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function TeacherDashboardScreen({ onBack }) {
+  // Mock Student Database Analytics
+  const studentData = [
+    { name: 'Andi Pratama', class: '8A', score: 950, accuracy: '95%', level: 8, status: 'Tuntas' },
+    { name: 'Siti Rahma', class: '8B', score: 910, accuracy: '91%', level: 8, status: 'Tuntas' },
+    { name: 'Budi Santoso', class: '8A', score: 870, accuracy: '87%', level: 7, status: 'Tuntas' },
+    { name: 'Rina Wijaya', class: '8C', score: 820, accuracy: '82%', level: 6, status: 'Progres' },
+    { name: 'Dimas Kurnia', class: '8B', score: 790, accuracy: '79%', level: 5, status: 'Progres' },
+    { name: 'Eka Putri', class: '8D', score: 740, accuracy: '74%', level: 4, status: 'Perlu Remedial' },
+  ];
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto w-full">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-cyan-400 flex items-center gap-2">
+            <span>👨‍🏫</span> Dashboard Guru — Analisis Pembelajaran IPA
+          </h2>
+          <p className="text-xs text-slate-400">Monitoring ketuntasan materi Gerak Lurus SMP Kelas VIII</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs font-bold"
+        >
+          ← Beranda
+        </button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Total Siswa Aktif</p>
+          <p className="text-2xl font-black text-slate-100 mt-1">32 Siswa</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Rata-Rata Skor</p>
+          <p className="text-2xl font-black text-amber-400 mt-1">845 Pts</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Rata-Rata Akurasi</p>
+          <p className="text-2xl font-black text-emerald-400 mt-1">81.5%</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+          <p className="text-[10px] text-slate-400 font-bold uppercase">Materi Paling Tertantang</p>
+          <p className="text-lg font-black text-red-400 mt-1">Konversi Satuan</p>
+        </div>
+      </div>
+
+      {/* Competency Mastery Visualizer Chart */}
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 shadow-xl">
+        <h3 className="font-bold text-slate-100 text-sm border-b border-slate-800 pb-3">
+          📊 Visualisasi Tingkat Penguasaan Kompetensi Siswa
+        </h3>
+
+        <div className="space-y-3">
+          {[
+            { label: 'Konsep Gerak & Kedudukan', pct: 92, color: 'bg-emerald-400' },
+            { label: 'Jarak & Perpindahan', pct: 88, color: 'bg-emerald-400' },
+            { label: 'Kelajuan (v = s/t)', pct: 85, color: 'bg-cyan-400' },
+            { label: 'Konversi Satuan (km/jam ↔ m/s)', pct: 64, color: 'bg-amber-400' },
+            { label: 'GLB (Gerak Lurus Beraturan)', pct: 80, color: 'bg-cyan-400' },
+            { label: 'GLBB (Percepatan &vt)', pct: 72, color: 'bg-cyan-400' },
+          ].map((item, idx) => (
+            <div key={idx} className="space-y-1">
+              <div className="flex justify-between text-xs text-slate-300">
+                <span>{item.label}</span>
+                <span className="font-mono font-bold">{item.pct}%</span>
+              </div>
+              <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                <div className={`${item.color} h-full rounded-full`} style={{ width: `${item.pct}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Student Progress Data Table */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+        <div className="p-4 bg-slate-950 border-b border-slate-800 font-bold text-xs text-slate-300">
+          📋 Tabel Capaian Siswa
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-slate-950/80 text-slate-500 uppercase font-mono border-b border-slate-800">
+              <tr>
+                <th className="p-3.5">Nama Siswa</th>
+                <th className="p-3.5">Kelas</th>
+                <th className="p-3.5">Skor Terbaik</th>
+                <th className="p-3.5">Akurasi</th>
+                <th className="p-3.5">Level Max</th>
+                <th className="p-3.5">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {studentData.map((row, i) => (
+                <tr key={i} className="hover:bg-slate-800/40 transition-colors">
+                  <td className="p-3.5 font-bold text-slate-100">{row.name}</td>
+                  <td className="p-3.5 text-slate-400">{row.class}</td>
+                  <td className="p-3.5 font-mono text-amber-400 font-bold">{row.score}</td>
+                  <td className="p-3.5 font-mono text-cyan-400">{row.accuracy}</td>
+                  <td className="p-3.5 font-mono">Level {row.level}</td>
+                  <td className="p-3.5">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                      row.status === 'Tuntas' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' :
+                      row.status === 'Progres' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30' :
+                      'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
